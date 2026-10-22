@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prehistóricos — MongoDB → Firebase</title>
+  <style>
+    :root {
+      --bg: #f3efe6;
+      --ink: #2c2416;
+      --panel: #fffdf8;
+      --accent: #6b4f2a;
+      --accent-2: #8a6a3b;
+      --line: #d9cbb3;
+      --ok: #2f6b3a;
+      --warn: #8a4b1f;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+      background:
+        radial-gradient(circle at 10% 10%, #efe4cf 0, transparent 40%),
+        radial-gradient(circle at 90% 0%, #e7d7b8 0, transparent 35%),
+        var(--bg);
+      color: var(--ink);
+    }
+    header {
+      padding: 1.25rem 1.5rem;
+      background: linear-gradient(120deg, #3d2f1c, #6b4f2a);
+      color: #f7efdf;
+    }
+    header h1 { margin: 0 0 .35rem; font-size: 1.7rem; letter-spacing: .02em; }
+    header p { margin: 0; opacity: .9; max-width: 52rem; }
+    .flujo {
+      display: flex; gap: .5rem; flex-wrap: wrap; margin-top: .75rem; font-size: .9rem;
+    }
+    .flujo span {
+      background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2);
+      padding: .25rem .6rem; border-radius: 999px;
+    }
+    main {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr 1fr;
+      gap: 1rem;
+      padding: 1rem 1.25rem 2rem;
+    }
+    section {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 1rem 1.1rem;
+      box-shadow: 0 8px 24px rgba(60, 40, 10, .06);
+    }
+    h2 { margin: 0 0 .75rem; font-size: 1.15rem; color: var(--accent); }
+    form { display: grid; gap: .45rem; margin-bottom: 1rem; }
+    input, select, textarea, button {
+      font: inherit; padding: .5rem .55rem; border-radius: 8px; border: 1px solid var(--line);
+    }
+    textarea { min-height: 70px; resize: vertical; }
+    button {
+      cursor: pointer; background: var(--accent); color: #fff; border: 0;
+    }
+    button.secundario { background: var(--accent-2); }
+    button.peligro { background: #7a2e2e; }
+    .lista { display: grid; gap: .65rem; }
+    .card {
+      border-top: 1px solid var(--line);
+      padding-top: .7rem;
+    }
+    .card h3 { margin: 0 0 .2rem; font-size: 1.05rem; }
+    .card p { margin: .15rem 0; font-size: .95rem; }
+    .meta { color: #6a5a42; font-size: .85rem; }
+    .acciones { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: .45rem; }
+    .acciones button { padding: .3rem .65rem; font-size: .9rem; }
+    .estado {
+      margin-bottom: .75rem; padding: .55rem .7rem; border-radius: 8px;
+      background: #eef6ef; color: var(--ok); border: 1px solid #cfe3d2; font-size: .9rem;
+    }
+    .estado.alerta { background: #fff2e8; color: var(--warn); border-color: #f0d3b8; }
+    .chip {
+      display: inline-block; background: #efe4cf; color: #4a3820;
+      padding: .1rem .45rem; border-radius: 999px; font-size: .8rem; margin-right: .25rem;
+    }
+    @media (max-width: 980px) {
+      main { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Catálogo de animales prehistóricos</h1>
+    <p>
+      Una sola petición crea, actualiza o elimina en <strong>MongoDB</strong> (primario)
+      y replica automáticamente en <strong>Firebase</strong>. Los dos ids se guardan en la colección
+      <code>mapeo_ids</code>.
+    </p>
+    <div class="flujo">
+      <span>1. POST → MongoDB</span>
+      <span>2. Réplica → Firestore</span>
+      <span>3. Guarda mongoId + firebaseId</span>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>Registrar animal (1 petición)</h2>
+      <form id="formulario">
+        <input name="nombre" placeholder="Nombre (ej. Rex)" required>
+        <input name="especie" placeholder="Especie (ej. Tyrannosaurus rex)" required>
+        <select name="periodo" required>
+          <option value="">Periodo</option>
+          <option>Triásico</option>
+          <option selected>Jurásico</option>
+          <option>Cretácico</option>
+          <option>Paleógeno</option>
+          <option>Neógeno</option>
+          <option>Pleistoceno</option>
+        </select>
+        <select name="dieta" required>
+          <option value="">Dieta</option>
+          <option>Herbívoro</option>
+          <option selected>Carnívoro</option>
+          <option>Omnívoro</option>
+          <option>Piscívoro</option>
+        </select>
+        <input name="habitat" placeholder="Hábitat" required>
+        <input name="longitudMetros" type="number" step="0.1" min="0" placeholder="Longitud (metros)">
+        <textarea name="descripcion" placeholder="Descripción breve" maxlength="500"></textarea>
+        <button type="submit">Crear en Mongo + replicar a Firebase</button>
+      </form>
+      <div id="estado" class="estado">Listo para registrar.</div>
+      <div class="acciones">
+        <button type="button" class="secundario" id="btnComparar">Comparar réplicas</button>
+        <button type="button" class="secundario" id="btnRecargar">Recargar paneles</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>MongoDB (primario)</h2>
+      <div id="lista-mongo" class="lista"></div>
+    </section>
+
+    <section>
+      <h2>Firebase (réplica)</h2>
+      <div id="lista-firebase" class="lista"></div>
+    </section>
+  </main>
+
+  <script>
+    const API = "/api/animales";
+    const estado = document.getElementById("estado");
+
+    async function pedir(url, metodo = "GET", cuerpo) {
+      const respuesta = await fetch(url, {
+        method: metodo,
+        headers: { "Content-Type": "application/json" },
+        body: cuerpo ? JSON.stringify(cuerpo) : undefined,
+      });
+      const datos = await respuesta.json();
+      if (!respuesta.ok) throw new Error(datos.error || "Error en la petición");
+      return datos;
+    }
+
+    function mostrarEstado(texto, alerta = false) {
+      estado.textContent = texto;
+      estado.classList.toggle("alerta", alerta);
+    }
+
+    function tarjetaMongo(animal) {
+      const div = document.createElement("div");
+      div.className = "card";
+      div.innerHTML = `
+        <h3>${animal.nombre}</h3>
+        <p><span class="chip">${animal.periodo}</span><span class="chip">${animal.dieta}</span></p>
+        <p><strong>${animal.especie}</strong> · ${animal.habitat}</p>
+        <p class="meta">Mongo: ${animal.id}<br>Firebase: ${animal.firebaseId || "—"}</p>
+      `;
+      const acciones = document.createElement("div");
+      acciones.className = "acciones";
+
+      const editar = document.createElement("button");
+      editar.type = "button";
+      editar.className = "secundario";
+      editar.textContent = "Editar hábitat";
+      editar.onclick = async () => {
+        const habitat = prompt("Nuevo hábitat:", animal.habitat);
+        if (!habitat) return;
+        try {
+          await pedir(`${API}/${animal.id}`, "PUT", { habitat });
+          mostrarEstado(`Actualizado en Mongo y Firebase: ${animal.nombre}`);
+          await cargarTodo();
+        } catch (e) {
+          mostrarEstado(e.message, true);
+        }
+      };
+
+      const borrar = document.createElement("button");
+      borrar.type = "button";
+      borrar.className = "peligro";
+      borrar.textContent = "Eliminar";
+      borrar.onclick = async () => {
+        if (!confirm(`¿Eliminar ${animal.nombre} en ambas bases?`)) return;
+        try {
+          await pedir(`${API}/${animal.id}`, "DELETE");
+          mostrarEstado(`Eliminado en Mongo y Firebase: ${animal.nombre}`);
+          await cargarTodo();
+        } catch (e) {
+          mostrarEstado(e.message, true);
+        }
+      };
+
+      acciones.append(editar, borrar);
+      div.append(acciones);
+      return div;
+    }
+
+    function tarjetaFirebase(animal) {
+      const div = document.createElement("div");
+      div.className = "card";
+      div.innerHTML = `
+        <h3>${animal.nombre}</h3>
+        <p><span class="chip">${animal.periodo}</span><span class="chip">${animal.dieta}</span></p>
+        <p><strong>${animal.especie}</strong> · ${animal.habitat}</p>
+        <p class="meta">Firebase: ${animal.id}<br>Mongo: ${animal.mongoId || "—"}</p>
+      `;
+      return div;
+    }
+
+    async function cargarTodo() {
+      const [mongo, firebase] = await Promise.all([
+        pedir(API),
+        pedir(`${API}/replicas/firebase`),
+      ]);
+      const cajaMongo = document.getElementById("lista-mongo");
+      const cajaFirebase = document.getElementById("lista-firebase");
+      cajaMongo.replaceChildren(...(mongo.length ? mongo.map(tarjetaMongo) : [textoVacio("Sin animales en Mongo")]));
+      cajaFirebase.replaceChildren(...(firebase.length ? firebase.map(tarjetaFirebase) : [textoVacio("Sin animales en Firebase")]));
+    }
+
+    function textoVacio(msg) {
+      const p = document.createElement("p");
+      p.className = "meta";
+      p.textContent = msg;
+      return p;
+    }
+
+    document.getElementById("formulario").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const fd = new FormData(ev.target);
+      const cuerpo = Object.fromEntries(fd.entries());
+      if (cuerpo.longitudMetros) cuerpo.longitudMetros = Number(cuerpo.longitudMetros);
+      else delete cuerpo.longitudMetros;
+
+      try {
+        const resultado = await pedir(API, "POST", cuerpo);
+        mostrarEstado(
+          `Creado: ${resultado.mongo.nombre} · mongoId=${resultado.mongo.id} · firebaseId=${resultado.firebase.id}`
+        );
+        ev.target.reset();
+        ev.target.periodo.value = "Jurásico";
+        ev.target.dieta.value = "Carnívoro";
+        await cargarTodo();
+      } catch (e) {
+        mostrarEstado(e.message, true);
+      }
+    });
+
+    document.getElementById("btnRecargar").onclick = async () => {
+      try {
+        await cargarTodo();
+        mostrarEstado("Paneles recargados.");
+      } catch (e) {
+        mostrarEstado(e.message, true);
+      }
+    };
+
+    document.getElementById("btnComparar").onclick = async () => {
+      try {
+        const c = await pedir(`${API}/replicas/comparar`);
+        const ok = c.todoSincronizado ? "sí" : "no";
+        mostrarEstado(
+          `Comparación: Mongo=${c.totales.mongo}, Firebase=${c.totales.firebase}, mapeos=${c.totales.mapeos}. Sincronizado: ${ok}`,
+          !c.todoSincronizado
+        );
+      } catch (e) {
+        mostrarEstado(e.message, true);
+      }
+    };
+
+    cargarTodo().catch((e) => mostrarEstado(e.message, true));
+  </script>
+</body>
+</html>

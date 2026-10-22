@@ -1,0 +1,226 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-preh-mongo-firebase-0001",
+    "name": "Prehistóricos — MongoDB → Firebase",
+    "description": "BD redundante: una sola petición escribe en MongoDB (primario) y replica en Firebase. Incluye endpoints para verificar las réplicas.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "SERVIDOR_BASE",
+      "value": "http://localhost:3060"
+    },
+    {
+      "key": "RUTA_ANIMALES",
+      "value": "/api/animales"
+    },
+    {
+      "key": "MONGO_ID",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Escritura (1 petición → ambas BDs)",
+      "item": [
+        {
+          "name": "Crear animal (Mongo + réplica Firebase)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.mongo && json.mongo.id) {",
+                  "  pm.collectionVariables.set('MONGO_ID', json.mongo.id);",
+                  "}",
+                  "pm.test('Creado en ambas bases', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "  pm.expect(json.mongo).to.have.property('id');",
+                  "  pm.expect(json.firebase).to.have.property('id');",
+                  "  pm.expect(json.mapeo.mongoId).to.eql(json.mongo.id);",
+                  "  pm.expect(json.mapeo.firebaseId).to.eql(json.firebase.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Rex\",\n  \"especie\": \"Tyrannosaurus rex\",\n  \"periodo\": \"Cretácico\",\n  \"dieta\": \"Carnívoro\",\n  \"habitat\": \"Llanuras de Laramidia\",\n  \"longitudMetros\": 12.3,\n  \"descripcion\": \"Depredador ápice del Cretácico superior\"\n}"
+            },
+            "url": {
+              "raw": "{{SERVIDOR_BASE}}{{RUTA_ANIMALES}}",
+              "host": ["{{SERVIDOR_BASE}}{{RUTA_ANIMALES}}"]
+            },
+            "description": "UNA sola petición: crea en MongoDB, replica en Firebase y guarda ambos ids en mapeo_ids."
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar animal (propaga a Firebase)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"habitat\": \"Bosques costeros de Laramidia\",\n  \"descripcion\": \"Actualizado: depredador ápice — réplica sincronizada\"\n}"
+            },
+            "url": {
+              "raw": "{{SERVIDOR_BASE}}{{RUTA_ANIMALES}}/{{MONGO_ID}}",
+              "host": ["{{SERVIDOR_BASE}}{{RUTA_ANIMALES}}"],
+              "path": ["{{MONGO_ID}}"]
+            },
+            "description": "UNA sola petición actualiza MongoDB y propaga el cambio a Firebase."
+          },
+          "response": []
+        },
+        {
+          "name": "Eliminar animal (ambas bases)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{SERVIDOR_BASE}}{{RUTA_ANIMALES}}/{{MONGO_ID}}",
+              "host": ["{{SERVIDOR_BASE}}{{RUTA_ANIMALES}}"],
+              "path": ["{{MONGO_ID}}"]
+            },
+            "description": "UNA sola petición elimina en MongoDB, Firebase y el mapeo de ids."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Pruebas de réplicas",
+      "item": [
+        {
+          "name": "Listar Mongo (primario)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SERVIDOR_BASE}}{{RUTA_ANIMALES}}",
+              "host": ["{{SERVIDOR_BASE}}{{RUTA_ANIMALES}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Firebase (réplica)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SERVIDOR_BASE}}{{RUTA_ANIMALES}}/replicas/firebase",
+              "host": ["{{SERVIDOR_BASE}}{{RUTA_ANIMALES}}"],
+              "path": ["replicas", "firebase"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar mapeo de ids",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SERVIDOR_BASE}}{{RUTA_ANIMALES}}/replicas/mapeos",
+              "host": ["{{SERVIDOR_BASE}}{{RUTA_ANIMALES}}"],
+              "path": ["replicas", "mapeos"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Comparar réplicas Mongo vs Firebase",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SERVIDOR_BASE}}{{RUTA_ANIMALES}}/replicas/comparar",
+              "host": ["{{SERVIDOR_BASE}}{{RUTA_ANIMALES}}"],
+              "path": ["replicas", "comparar"]
+            },
+            "description": "Verifica que cada par mongoId/firebaseId exista en ambas bases y que los campos clave coincidan."
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener uno (Mongo + Firebase + mapeo)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{SERVIDOR_BASE}}{{RUTA_ANIMALES}}/{{MONGO_ID}}",
+              "host": ["{{SERVIDOR_BASE}}{{RUTA_ANIMALES}}"],
+              "path": ["{{MONGO_ID}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Ejemplos de datos",
+      "item": [
+        {
+          "name": "Crear Triceratops",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Tres Cuernos\",\n  \"especie\": \"Triceratops horridus\",\n  \"periodo\": \"Cretácico\",\n  \"dieta\": \"Herbívoro\",\n  \"habitat\": \"Planicies aluviales\",\n  \"longitudMetros\": 9,\n  \"descripcion\": \"Ceratópsido con gola ósea y tres cuernos\"\n}"
+            },
+            "url": {
+              "raw": "{{SERVIDOR_BASE}}{{RUTA_ANIMALES}}",
+              "host": ["{{SERVIDOR_BASE}}{{RUTA_ANIMALES}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Crear Mamut lanudo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Lanudo\",\n  \"especie\": \"Mammuthus primigenius\",\n  \"periodo\": \"Pleistoceno\",\n  \"dieta\": \"Herbívoro\",\n  \"habitat\": \"Estepa del mamut\",\n  \"longitudMetros\": 4.5,\n  \"descripcion\": \"Proboscídeo adaptado al frío con pelaje denso\"\n}"
+            },
+            "url": {
+              "raw": "{{SERVIDOR_BASE}}{{RUTA_ANIMALES}}",
+              "host": ["{{SERVIDOR_BASE}}{{RUTA_ANIMALES}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
