@@ -1,0 +1,20 @@
+{
+  "name": "demo-prehistoricos",
+  "version": "1.0.0",
+  "description": "BD redundante: MongoDB (primario) → Firebase (réplica) — dinosaurios y animales prehistóricos",
+  "main": "server.js",
+  "scripts": {
+    "start": "nodemon server.js",
+    "dev": "nodemon --watch server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^18.0.6",
+    "express": "^5.2.1",
+    "firebase-admin": "^14.5.0",
+    "mongoose": "^9.11.1",
+    "nodemon": "^3.1.14"
+  }
+}
